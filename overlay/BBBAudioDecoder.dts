@@ -1,0 +1,118 @@
+/*
+ * To be able to load this, be sure to disable HDMI and the universal IO cape in /boot/uEnv.txt
+ * TODO: Or, will it do that when the cape is present at boot?
+ *
+ * Author: wiebe@halfgaar.net
+ */
+
+/dts-v1/;
+/plugin/;
+
+/{
+    compatible = "ti,beaglebone", "ti,beaglebone-black","ti,beaglebone-green";
+    part-number = "BBBAudioDecoder";
+    version = "00A0";
+
+    fragment@0 {
+        target = <&am33xx_pinmux>;
+            
+        __overlay__ {
+            mcasp0_pins: pinmux_mcasp0_pins {
+                pinctrl-single,pins = <
+                    0x078 0x26  /* P9 pin 12. Wanted function: mcasp0_aclkr_mux3 (mode6) */
+                    0x1ac 0x20  /* P9 pin 25. Wanted function: mcasp0_ahclkx (mode 0) */
+                    0x1a4 0x20  /* P9 pin 27. Wanted function: mcasp0_fsr (mode 0) */
+                    0x19c 0x22  /* P9 pin 28. Wanted function: mcasp0_axr2 (mode 0) */
+                    0x194 0x20  /* P9 pin 29. Wanted function: mcasp0_fsx (mode 0) */
+                    0x198 0x20  /* P9 pin 30. Wanted function: mcasp0_axr0 (mode 0) */
+                    0x190 0x20  /* P9 pin 31. Wanted function: mcasp0_aclkx (mode 0) */
+                    0x06c 0x07  /* gpmc_a11.GPIO1_27 mux mode 7, needs to be 1 for ahclkx clock output */
+                >;
+            };
+
+            bbb_audio_decoder_pcm1690_i2c_pins: pinmux_bbb_audio_decoder_pcm1690_i2c_pins {
+                pinctrl-single,pins = <
+                    0x15c 0x32  /* P9 pin 17. Wanted function: I2C1_SCL (PCM1690) (mode 2) */
+                    0x158 0x32  /* P9 pin 18. Wanted function: I2C1_SDA (PCM1690) (mode 2) */
+                >;
+            };
+
+            bbb_audio_decoder_led_pins: pinmux_bbb_audiodecoder_led_pins {
+                pinctrl-single,pins = <
+                    0x1b4 0x0f  /* P9 pin 41. Wanted function: GPIO0[20] (Ready LED) (mode 7) */
+                    0x164 0x0f  /* P9 pin 42. Wanted function: GPIO0[7] (Decoding LED) (mode 7) */
+                >;
+            };
+
+            bbb_audio_decoder_control_pins: pinmux_bbb_audiodecoder_control {
+                pinctrl-single,pins = <
+                    0x040 0x0f  /* P9 pin 15. Wanted function: GPIO1[16] (reset DAC/DIR9001) (mode 7) */
+                    0x04c 0x2f  /* P9 pin 16. Wanted function: GPIO1[19] (DIR9001 'is-audio' in) (mode 7) */
+                >;
+            };
+        };
+    };
+
+    fragment@1 {
+        // All the stuff I read on the internet about the difference between
+        // hardware and software i2c bus numbers doesn't seem to be the case
+        // anymore. The PCM1690 is present on i2c1.
+        target = <&i2c1>;
+        __overlay__ {
+            #address-cells = <1>;
+            #size-cells = <0>;
+            clock-frequency = <100000>;
+            status = "okay";
+            pinctrl-names = "default";
+            pinctrl-0 = <&bbb_audio_decoder_pcm1690_i2c_pins>;
+
+            pcm1690: pcm1690@0{
+              compatible = "ti,pcm1690";
+              reg = <0x4E>; // I2c address, 1001110
+              status = "okay";
+            };
+        };
+    };
+
+    fragment@2 {
+        target = <&mcasp0>;
+        __overlay__ {
+          pinctrl-names = "default";
+          pinctrl-0 = <&mcasp0_pins>;
+
+          status = "okay";
+
+          op-mode = <0>;          /* MCASP_IIS_MODE */ // ???
+          tdm-slots = <8>;
+          num-serializer = <16>;
+          serial-dir = <  /* 0: INACTIVE, 1: TX, 2: RX */
+            1 1 1 1
+          >;
+          tx-num-evt = <1>; //enble tx_fifo (boolean)
+       }; 
+    };
+
+    fragment@3 {
+      target = <&ocp>;
+        __overlay__ {
+
+          sound {
+              compatible = "halfgaar,bbbaudiodecoder";
+              model = "BBBAudioDecoder";
+              audio-codec = <&pcm1690>;
+              mcasp-controller = <&mcasp0>;
+              audiocard-tdm-slots = <8>;
+              codec-clock-rate = <24576000>;
+              cpu-clock-rate = <24576000>;
+              // TODO: change this from the example. This is different in the PCM16xx
+              audio-routing =
+                "Line Out",             "DAC1OUT",
+                "Line Out",             "DAC2OUT",
+                "Line Out",             "DAC3OUT",
+                "Line Out",             "DAC4OUT",
+                "ADC1IN",               "Line In",
+                "ADC2IN",               "Line In";
+            };
+        };
+    };
+};

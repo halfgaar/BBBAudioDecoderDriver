@@ -1,0 +1,7 @@
+#!/bin/bash -e
+
+echo "Compiling the overlay from .dts to .dtbo"
+
+dtc -O dtb -o BBBAudioDecoder-00A0.dtbo -b 0 -@ BBBAudioDecoder.dts
+echo "Copying..."
+cp BBBAudioDecoder-00A0.dtbo /lib/firmware
