@@ -2,6 +2,7 @@
 #include <linux/platform_device.h>
 #include <sound/core.h>
 #include <sound/soc.h>
+#include <linux/gpio.h>
 
 static int snd_bbb_audio_decoder_init(struct snd_soc_pcm_runtime *rtd)
 {
@@ -52,6 +53,25 @@ static const struct of_device_id snd_bbb_audio_decoder_dt_ids[] =
 
 static int snd_bbb_audio_decoder_probe(struct platform_device *pdev)
 {
+  unsigned int clock_enable_line = 59; // GPIO1_27. Needs to be 1 on BBB to enable the oscillator output on GPIO3_21
+  unsigned int reset_active_low = 48;
+  unsigned int temp_test_led = 7;
+
+  // Enable the I2s ahclkx master clock (at hardware-fixed 24576000 Hz) and set the RST pin high to activate the chips.
+  int ret = 0;
+  ret = gpio_request(clock_enable_line, "ahclkx_enable");
+  if (ret != 0 )
+    return ret;
+  ret = gpio_request(reset_active_low, "bbb_reset_active_low");
+  if (ret != 0 )
+    return ret;
+  ret = gpio_request(temp_test_led, "temp_test_led");
+  if (ret != 0 )
+    return ret;
+  gpio_direction_output(clock_enable_line, 1);
+  gpio_direction_output(reset_active_low, 1);
+  gpio_direction_output(temp_test_led, 1);
+
   return 0;
 }
 
