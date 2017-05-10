@@ -17,6 +17,8 @@
  * GNU General Public License for more details.
  */
 
+// TODO: this DAC also supports 32 bit
+
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
@@ -43,12 +45,11 @@
 #define PCM1690_DEEMPH_RATE_MASK	0x18
 #define PCM1690_DEEMPH_MASK		0x01
 
-#define PCM1690_ATT_CONTROL(X)	(X <= 6 ? X : X + 9) /* Attenuation level */
-#define PCM1690_SOFT_MUTE	0x07	/* Soft mute control register */
-#define PCM1690_DAC_CONTROL	0x08	/* DAC operation control */
-#define PCM1690_FMT_CONTROL	0x09	/* Audio interface data format */
+#define PCM1690_ATT_CONTROL(X)	(71 + X) /* Attenuation level */
+#define PCM1690_SOFT_MUTE	0x44	/* Soft mute control register */
+#define PCM1690_FMT_CONTROL	0x41	/* Audio interface data format */
 #define PCM1690_DEEMPH_CONTROL	0x0a	/* De-emphasis control */
-#define PCM1690_ZERO_DETECT_STATUS	0x0e	/* Zero detect status reg */
+#define PCM1690_ZERO_DETECT_STATUS	0x45	/* Zero detect status reg */
 
 static const struct reg_default pcm1690_reg_defaults[] = {
 	{ 0x01,	0xff },
@@ -181,15 +182,15 @@ static int pcm1690_hw_params(struct snd_pcm_substream *substream,
 	switch (priv->format & SND_SOC_DAIFMT_FORMAT_MASK) {
 	case SND_SOC_DAIFMT_RIGHT_J:
 		if (pcm_format == SNDRV_PCM_FORMAT_S24_LE)
-			val = 0x00;
+			val = 0x02;
 		else if (pcm_format == SNDRV_PCM_FORMAT_S16_LE)
 			val = 0x03;
 		break;
 	case SND_SOC_DAIFMT_I2S:
-		val = 0x04;
+		val = 0x00;
 		break;
 	case SND_SOC_DAIFMT_LEFT_J:
-		val = 0x05;
+		val = 0x01;
 		break;
 	default:
 		dev_err(codec->dev, "Invalid DAI format\n");
