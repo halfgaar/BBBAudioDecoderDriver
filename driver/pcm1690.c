@@ -145,7 +145,7 @@ static int pcm1690_set_dai_fmt(struct snd_soc_dai *codec_dai,
 
 	/* The PCM1690 can only be slave to all clocks */
 	if ((format & SND_SOC_DAIFMT_MASTER_MASK) != SND_SOC_DAIFMT_CBS_CFS) {
-		dev_err(codec->dev, "Invalid clocking mode\n");
+		dev_err(codec->dev, "Invalid clocking mode. PCM1690 can only be slave: (SND_SOC_DAIFMT_CBS_CFS)\n");
 		return -EINVAL;
 	}
 
