@@ -51,23 +51,22 @@
 #define PCM1690_ZERO_DETECT_STATUS	0x45	/* Zero detect status reg */
 
 static const struct reg_default pcm1690_reg_defaults[] = {
-	{ 0x01,	0xff },
-	{ 0x02,	0xff },
-	{ 0x03,	0xff },
-	{ 0x04,	0xff },
-	{ 0x05,	0xff },
-	{ 0x06,	0xff },
-	{ 0x07,	0x00 },
-	{ 0x08,	0x00 },
-	{ 0x09,	0x06 },
-	{ 0x0A,	0x00 },
-	{ 0x0B,	0xff },
-	{ 0x0C,	0x0f },
-	{ 0x0D,	0x00 },
-	{ 0x10,	0xff },
-	{ 0x11,	0xff },
-	{ 0x12,	0x00 },
-	{ 0x13,	0x00 },
+	{ 0x40,	0xC0 }, // 11000000, only the MRST and SRST reset registers are 1.
+	{ 0x41,	0x00 },
+	{ 0x42,	0x00 },
+	{ 0x43,	0x00 },
+	{ 0x44,	0x00 },
+	{ 0x45,	0x00 },
+	{ 0x46,	0x00 },
+	{ 0x47,	0x00 },
+	{ 0x48,	0xff }, // Default volume at 0 dB attenuation
+	{ 0x49,	0xff }, // Default volume at 0 dB attenuation
+	{ 0x4A,	0xff }, // Default volume at 0 dB attenuation
+	{ 0x4B,	0xff }, // Default volume at 0 dB attenuation
+	{ 0x4C,	0xff }, // Default volume at 0 dB attenuation
+	{ 0x4D,	0xff }, // Default volume at 0 dB attenuation
+	{ 0x4E,	0xff }, // Default volume at 0 dB attenuation
+	{ 0x4F,	0xff }, // Default volume at 0 dB attenuation
 };
 
 static bool pcm1690_accessible_reg(struct device *dev, unsigned int reg)
@@ -275,7 +274,7 @@ MODULE_DEVICE_TABLE(of, pcm1690_dt_ids);
 static const struct regmap_config pcm1690_regmap = {
 	.reg_bits		= 8,
 	.val_bits		= 8,
-	.max_register		= 0x13,
+	.max_register		= 0x4f,
 	.reg_defaults		= pcm1690_reg_defaults,
 	.num_reg_defaults	= ARRAY_SIZE(pcm1690_reg_defaults),
 	.writeable_reg		= pcm1690_writeable_reg,
