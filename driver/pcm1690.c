@@ -42,13 +42,12 @@
 			     SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000)
 
 #define PCM1690_SOFT_MUTE_ALL		0xff
-#define PCM1690_DEEMPH_RATE_MASK	0x18
-#define PCM1690_DEEMPH_MASK		0x01
+#define PCM1690_DEEMPH_RATE_MASK	0x30
 
 #define PCM1690_ATT_CONTROL(X)	(71 + X) /* Attenuation level */
 #define PCM1690_SOFT_MUTE	0x44	/* Soft mute control register */
 #define PCM1690_FMT_CONTROL	0x41	/* Audio interface data format */
-#define PCM1690_DEEMPH_CONTROL	0x0a	/* De-emphasis control */
+#define PCM1690_DEEMPH_CONTROL	0x46	/* De-emphasis control */
 #define PCM1690_ZERO_DETECT_STATUS	0x45	/* Zero detect status reg */
 
 static const struct reg_default pcm1690_reg_defaults[] = {
@@ -91,28 +90,30 @@ struct pcm1690_private {
 	unsigned int rate;
 };
 
-static const int pcm1690_deemph[] = { 44100, 48000, 32000 };
+static const int pcm1690_deemph[] = { 0, 48000, 44100, 32000 };
 
 static int pcm1690_set_deemph(struct snd_soc_codec *codec)
 {
 	struct pcm1690_private *priv = snd_soc_codec_get_drvdata(codec);
-	int i = 0, val = -1, enable = 0;
+	int i = 0, val = -1;
 
-	if (priv->deemph)
-		for (i = 0; i < ARRAY_SIZE(pcm1690_deemph); i++)
-			if (pcm1690_deemph[i] == priv->rate)
-				val = i;
+  if (!priv->deemph)
+  {
+    return regmap_update_bits(priv->regmap, PCM1690_DEEMPH_CONTROL, PCM1690_DEEMPH_RATE_MASK, 0);
+  }
+  else
+  {
+    for (i = 0; i < ARRAY_SIZE(pcm1690_deemph); i++)
+      if (pcm1690_deemph[i] == priv->rate)
+        val = i;
 
-	if (val != -1) {
-		regmap_update_bits(priv->regmap, PCM1690_DEEMPH_CONTROL,
-					PCM1690_DEEMPH_RATE_MASK, val);
-		enable = 1;
-	} else
-		enable = 0;
+    if (val != -1)
+    {
+      return regmap_update_bits(priv->regmap, PCM1690_DEEMPH_CONTROL, PCM1690_DEEMPH_RATE_MASK, val);
+    }
+  }
 
-	/* enable/disable deemphasis functionality */
-	return regmap_update_bits(priv->regmap, PCM1690_DEEMPH_CONTROL,
-					PCM1690_DEEMPH_MASK, enable);
+  return -1;
 }
 
 static int pcm1690_get_deemph(struct snd_kcontrol *kcontrol,
