@@ -9,8 +9,60 @@
 #define RESET_ACTIVE_LOW 48
 #define TEMP_TEST_LED 7
 
+static const struct snd_soc_dapm_widget pcm1690_dapm_widgets[] =
+{
+  SND_SOC_DAPM_LINE("Line Out", NULL),
+};
+
 static int snd_bbb_audio_decoder_init(struct snd_soc_pcm_runtime *rtd)
 {
+  struct snd_soc_card *card = rtd->card;
+  struct device_node *np = card->dev->of_node;
+  struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+  int ret;
+  unsigned int tdm_mask = 0x00;
+  u32 cpu_to_dac_tdm_slots;
+
+  dev_info(card->dev, "Init starting...");
+
+  snd_soc_dapm_new_controls(&card->dapm, pcm1690_dapm_widgets, ARRAY_SIZE(pcm1690_dapm_widgets));
+
+  if (!np)
+  {
+    dev_err(card->dev, "No device tree node loaded?");
+    return -1;
+  }
+
+  ret = of_property_read_u32(np, "cpu-to-dac-tdm-slots", &cpu_to_dac_tdm_slots);
+  if (ret)
+  {
+    dev_err(card->dev, "Unable to obtain 'cpu-to-dac-tdm-slots' from device tree");
+    return ret;
+  }
+
+  if (cpu_to_dac_tdm_slots > 8 || cpu_to_dac_tdm_slots < 2 )
+  {
+    dev_err(card->dev, "cpu_to_dac_tdm_slots must be between 2 and 8");
+    return -1;
+  }
+
+  tdm_mask = 0xFF;
+  tdm_mask = tdm_mask >> (8 - cpu_to_dac_tdm_slots);
+
+  // I think where the ctag-face sets the codec_dai TDM slots, I have to do that for the DIR9001? It
+  // has no software control, so do that with jumpers. However, it has no TDM, because it does stereo or raw.
+
+  // TDM setting for audio output, I think? Does this then configure the DAC with its sample format, or something?
+  dev_info(card->dev, "Setting TDM slots on audio processor, for output, to %d", cpu_to_dac_tdm_slots);
+  ret = snd_soc_dai_set_tdm_slot(cpu_dai, tdm_mask, tdm_mask, cpu_to_dac_tdm_slots, 32);
+  if (ret < 0)
+  {
+    dev_err(cpu_dai->dev, "Unable to set McASP TDM slots.\n");
+    return ret;
+  }
+
+  dev_info(card->dev, "Card initialised.");
+
   return 0;
 }
 
@@ -130,7 +182,7 @@ static struct platform_driver snd_bbb_audio_decoder_driver =
   .driver = 
   {
     .name = "snd_bbb_audio_decoder",
-    /*.pm = &snd_soc_pm_ops,*/
+    .pm = &snd_soc_pm_ops,
     .of_match_table = of_match_ptr(snd_bbb_audio_decoder_dt_ids)
   },
   .probe = snd_bbb_audio_decoder_probe,

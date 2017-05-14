@@ -101,17 +101,9 @@
               model = "BBBAudioDecoder";
               audio-codec = <&pcm1690>;
               mcasp-controller = <&mcasp0>;
-              audiocard-tdm-slots = <8>;
+              cpu-to-dac-tdm-slots = <8>;
               codec-clock-rate = <24576000>;
               cpu-clock-rate = <24576000>;
-              // TODO: change this from the example. This is different in the PCM16xx
-              audio-routing =
-                "Line Out",             "DAC1OUT",
-                "Line Out",             "DAC2OUT",
-                "Line Out",             "DAC3OUT",
-                "Line Out",             "DAC4OUT",
-                "ADC1IN",               "Line In",
-                "ADC2IN",               "Line In";
             };
         };
     };
