@@ -71,7 +71,7 @@ static const struct reg_default pcm1690_reg_defaults[] = {
 
 static bool pcm1690_accessible_reg(struct device *dev, unsigned int reg)
 {
-	return !((reg == 0x00) || (reg == 0x0f));
+	return reg >= 0x40 && reg <= 0x4f;
 }
 
 static bool pcm1690_writeable_reg(struct device *dev, unsigned register reg)
