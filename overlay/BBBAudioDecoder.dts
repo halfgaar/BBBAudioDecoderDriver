@@ -19,13 +19,13 @@
         __overlay__ {
             mcasp0_pins: pinmux_mcasp0_pins {
                 pinctrl-single,pins = <
-                    0x078 0x26  /* P9 pin 12. Wanted function: mcasp0_aclkr_mux3 (mode6) */
-                    0x1ac 0x20  /* P9 pin 25. Wanted function: mcasp0_ahclkx (mode 0) */
-                    0x1a4 0x20  /* P9 pin 27. Wanted function: mcasp0_fsr (mode 0) */
-                    0x19c 0x22  /* P9 pin 28. Wanted function: mcasp0_axr2 (mode 0) */
-                    0x194 0x20  /* P9 pin 29. Wanted function: mcasp0_fsx (mode 0) */
-                    0x198 0x20  /* P9 pin 30. Wanted function: mcasp0_axr0 (mode 0) */
-                    0x190 0x20  /* P9 pin 31. Wanted function: mcasp0_aclkx (mode 0) */
+                    0x078 0x2e  /* P9 pin 12. Wanted function: mcasp0_aclkr_mux3 (mode6) */
+                    0x1ac 0x28  /* P9 pin 25. Wanted function: mcasp0_ahclkx (mode 0) */
+                    0x1a4 0x28  /* P9 pin 27. Wanted function: mcasp0_fsr (mode 0) */
+                    0x19c 0x2a  /* P9 pin 28. Wanted function: mcasp0_axr2 (mode 0) */
+                    0x194 0x28  /* P9 pin 29. Wanted function: mcasp0_fsx (mode 0) */
+                    0x198 0x28  /* P9 pin 30. Wanted function: mcasp0_axr0 (mode 0) */
+                    0x190 0x28  /* P9 pin 31. Wanted function: mcasp0_aclkx (mode 0) */
                     0x06c 0x07  /* gpmc_a11.GPIO1_27 mux mode 7, needs to be 1 for ahclkx clock output */
                 >;
             };
