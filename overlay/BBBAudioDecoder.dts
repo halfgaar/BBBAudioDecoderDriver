@@ -84,9 +84,8 @@
 
           op-mode = <0>;          /* MCASP_IIS_MODE */ // ???
           tdm-slots = <8>;
-          num-serializer = <16>;
           serial-dir = <  /* 0: INACTIVE, 1: TX, 2: RX */
-            1 1 1 1
+            2 0 1 0 /* The McASP has four serializers/channels. I use axr0 as input from DIR9001, and axr2 as output to PCM1690 */
           >;
           tx-num-evt = <1>; //enble tx_fifo (boolean)
        }; 
@@ -102,7 +101,6 @@
               audio-codec = <&pcm1690>;
               mcasp-controller = <&mcasp0>;
               cpu-to-dac-tdm-slots = <8>;
-              codec-clock-rate = <24576000>;
               cpu-clock-rate = <24576000>;
             };
         };

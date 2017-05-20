@@ -1,13 +1,18 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/of_platform.h>
+#include <linux/clk.h>
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <linux/gpio.h>
 
-#define CLOCK_ENABLE_LINE 59 // GPIO1_27. Needs to be 1 on BBB to enable the oscillator output on GPIO3_21
 #define RESET_ACTIVE_LOW 48
 #define TEMP_TEST_LED 7
+
+struct snd_soc_card_drvdata_bbb_audio_decoder {
+  struct clk *mclk;
+  unsigned sysclk;
+};
 
 static const struct snd_soc_dapm_widget pcm1690_dapm_widgets[] =
 {
@@ -68,17 +73,42 @@ static int snd_bbb_audio_decoder_init(struct snd_soc_pcm_runtime *rtd)
 
 static int snd_bbb_audio_deocer_set_hw_params(struct snd_pcm_substream *substream, struct snd_pcm_hw_params *params)
 {
+  int ret = 0;
+  struct snd_soc_pcm_runtime *rtd = substream->private_data;
+  struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+  struct snd_soc_card *soc_card = rtd->card;
+  unsigned cpu_clock = ((struct snd_soc_card_drvdata_bbb_audio_decoder *) snd_soc_card_get_drvdata(soc_card))->sysclk;
+
+  ret = snd_soc_dai_set_sysclk(cpu_dai, 0, cpu_clock, SND_SOC_CLOCK_OUT);
+  if (ret < 0){
+    dev_err(cpu_dai->dev, "Unable to set cpu dai sysclk: %d.\n", ret);
+    return ret;
+  }
+  dev_dbg(cpu_dai->dev, "Set CPU DAI clock rate to %d.\n", cpu_clock);
+
   return 0;
 }
 
 static int snd_bbb_audio_decoder_stream_startup(struct snd_pcm_substream *substream)
 {
+  struct snd_soc_pcm_runtime *rtd = substream->private_data;
+  struct snd_soc_card *soc_card = rtd->card;
+  struct snd_soc_card_drvdata_bbb_audio_decoder *drvdata = snd_soc_card_get_drvdata(soc_card);
+
+  if (drvdata->mclk)
+    return clk_prepare_enable(drvdata->mclk);
+
   return 0;
 }
 
 static void snd_bbb_audio_decoder_stream_shutdown(struct snd_pcm_substream *substream)
 {
+  struct snd_soc_pcm_runtime *rtd = substream->private_data;
+  struct snd_soc_card *soc_card = rtd->card;
+  struct snd_soc_card_drvdata_bbb_audio_decoder *drvdata = snd_soc_card_get_drvdata(soc_card);
 
+  if (drvdata->mclk)
+    clk_disable_unprepare(drvdata->mclk);
 }
 
 static struct snd_soc_ops snd_bbb_audio_decoder_ops = 
@@ -122,6 +152,8 @@ static int snd_bbb_audio_decoder_probe(struct platform_device *pdev)
   struct device_node *np = pdev->dev.of_node;
   const struct of_device_id *match = of_match_device(of_match_ptr(snd_bbb_audio_decoder_dt_ids), &pdev->dev);
   struct snd_soc_dai_link *dai = (struct snd_soc_dai_link *) match->data;
+  struct snd_soc_card_drvdata_bbb_audio_decoder *drvdata = NULL;
+  struct clk *mclk;
   int ret = 0;
 
   snd_bbb_audio_decoder_card.dai_link = dai;
@@ -141,21 +173,53 @@ static int snd_bbb_audio_decoder_probe(struct platform_device *pdev)
   if (ret)
     return ret;
 
-  // Enable the I2s ahclkx master clock (at hardware-fixed 24576000 Hz) and set the RST pin high to activate the chips.
-  ret = gpio_request(CLOCK_ENABLE_LINE, "ahclkx_enable");
-  if (ret != 0 )
-    return ret;
+  mclk = devm_clk_get(&pdev->dev, "mclk");
+  if (PTR_ERR(mclk) == -EPROBE_DEFER)
+  {
+    return -EPROBE_DEFER;
+  }
+  else if (IS_ERR(mclk))
+  {
+    dev_dbg(&pdev->dev, "mclk not found.\n");
+    mclk = NULL;
+  }
+
+  drvdata = devm_kzalloc(&pdev->dev, sizeof(*drvdata), GFP_KERNEL);
+  if (!drvdata)
+    return -ENOMEM;
+
+  drvdata->mclk = mclk;
+
+  ret = of_property_read_u32(np, "cpu-clock-rate", &drvdata->sysclk);
+  if (ret < 0)
+  {
+    if (!drvdata->mclk)
+    {
+      dev_err(&pdev->dev, "No clock or clock rate defined.\n");
+      return -EINVAL;
+    }
+    drvdata->sysclk = clk_get_rate(drvdata->mclk);
+  }
+  else if (drvdata->mclk)
+  {
+    unsigned int requestd_rate = drvdata->sysclk;
+    clk_set_rate(drvdata->mclk, drvdata->sysclk);
+    drvdata->sysclk = clk_get_rate(drvdata->mclk);
+    if (drvdata->sysclk != requestd_rate)
+      dev_warn(&pdev->dev, "Could not get requested rate %u using %u.\n", requestd_rate, drvdata->sysclk);
+  }
+
   ret = gpio_request(RESET_ACTIVE_LOW, "bbb_reset_active_low");
   if (ret != 0 )
     return ret;
   ret = gpio_request(TEMP_TEST_LED, "temp_test_led");
   if (ret != 0 )
     return ret;
-  gpio_direction_output(CLOCK_ENABLE_LINE, 1);
   gpio_direction_output(RESET_ACTIVE_LOW, 1);
   gpio_direction_output(TEMP_TEST_LED, 1);
 
   dev_info(&pdev->dev, "About to register card");
+  snd_soc_card_set_drvdata(&snd_bbb_audio_decoder_card, drvdata);
   ret = devm_snd_soc_register_card(&pdev->dev, &snd_bbb_audio_decoder_card);
   if (ret)
     dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
@@ -165,10 +229,8 @@ static int snd_bbb_audio_decoder_probe(struct platform_device *pdev)
 
 static int snd_bbb_audio_decoder_remove(struct platform_device *pdev)
 {
-  gpio_set_value(CLOCK_ENABLE_LINE, 0);
   gpio_set_value(RESET_ACTIVE_LOW, 0);
   gpio_set_value(TEMP_TEST_LED, 0);
-  gpio_free(CLOCK_ENABLE_LINE);
   gpio_free(RESET_ACTIVE_LOW);
   gpio_free(TEMP_TEST_LED);
 
