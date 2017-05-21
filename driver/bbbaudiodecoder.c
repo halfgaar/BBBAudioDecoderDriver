@@ -24,6 +24,7 @@ static int snd_bbb_audio_decoder_init(struct snd_soc_pcm_runtime *rtd)
   struct snd_soc_card *card = rtd->card;
   struct device_node *np = card->dev->of_node;
   struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+  struct snd_soc_dai *dac_dai = rtd->codec_dai;
   int ret;
   unsigned int tdm_mask = 0x00;
   u32 cpu_to_dac_tdm_slots;
@@ -54,8 +55,11 @@ static int snd_bbb_audio_decoder_init(struct snd_soc_pcm_runtime *rtd)
   tdm_mask = 0xFF;
   tdm_mask = tdm_mask >> (8 - cpu_to_dac_tdm_slots);
 
-  // I think where the ctag-face sets the codec_dai TDM slots, I have to do that for the DIR9001? It
-  // has no software control, so do that with jumpers. However, it has no TDM, because it does stereo or raw.
+  ret = snd_soc_dai_set_tdm_slot(dac_dai, 0, 0, 8, 32);
+  if (ret < 0){
+    dev_err(dac_dai->dev, "Unable to set pcm1690 TDM slots.\n");
+    return ret;
+  }
 
   // TDM setting for audio output, I think? Does this then configure the DAC with its sample format, or something?
   dev_info(card->dev, "Setting TDM slots on audio processor, for output, to %d", cpu_to_dac_tdm_slots);
@@ -119,8 +123,7 @@ static struct snd_soc_ops snd_bbb_audio_decoder_ops =
 };
 
 // Apparently, the mcasp platform driver has rxclk and txclk async in I2S mode? I need that, for my two different chips.
-// TODO: research polarity (SND_SOC_DAIFMT_NB_NF?) and i2s mode.
-#define BBB_AUDIO_DECODER_DAIFMT ( SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS )
+#define BBB_AUDIO_DECODER_DAIFMT ( SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_IF| SND_SOC_DAIFMT_CBS_CFS )
 static struct snd_soc_dai_link snd_bbb_audio_decoder_dai = 
 {
   .name = "Halfgaar BBBAudioDecoder",

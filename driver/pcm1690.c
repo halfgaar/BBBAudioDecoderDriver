@@ -87,6 +87,7 @@ struct pcm1690_private {
 	unsigned int deemph;
 	/* Current rate for deemphasis control */
 	unsigned int rate;
+	unsigned int tdm_slots;
 };
 
 static const int pcm1690_deemph[] = { 0, 48000, 44100, 32000 };
@@ -176,26 +177,53 @@ static int pcm1690_hw_params(struct snd_pcm_substream *substream,
 	struct pcm1690_private *priv = snd_soc_codec_get_drvdata(codec);
 	int val = 0, ret;
 	int pcm_format = params_format(params);
+	unsigned int masked_format = priv->format & SND_SOC_DAIFMT_FORMAT_MASK ;
 
 	priv->rate = params_rate(params);
 
-	switch (priv->format & SND_SOC_DAIFMT_FORMAT_MASK) {
-	case SND_SOC_DAIFMT_RIGHT_J:
-		if (pcm_format == SNDRV_PCM_FORMAT_S24_LE)
-			val = 0x02;
-		else if (pcm_format == SNDRV_PCM_FORMAT_S16_LE)
-			val = 0x03;
-		break;
-	case SND_SOC_DAIFMT_I2S:
-		val = 0x00;
-		break;
-	case SND_SOC_DAIFMT_LEFT_J:
-		val = 0x01;
-		break;
-	default:
-		dev_err(codec->dev, "Invalid DAI format\n");
-		return -EINVAL;
-	}
+  if (priv->tdm_slots == 8)
+  {
+    switch (masked_format) {
+    case SND_SOC_DAIFMT_RIGHT_J:
+      dev_err(codec->dev, "Invalid DAI format: with 8 TDM slots, you can't have SND_SOC_DAIFMT_RIGHT_J.\n");
+      return -EINVAL;
+    case SND_SOC_DAIFMT_I2S:
+      val = 0x06;
+      break;
+    case SND_SOC_DAIFMT_LEFT_J:
+      val = 0x07;
+      break;
+    default:
+      dev_err(codec->dev, "Invalid DAI format\n");
+      return -EINVAL;
+    }
+  }
+  else if (priv->tdm_slots == 2)
+  {
+    switch (masked_format)
+    {
+      case SND_SOC_DAIFMT_RIGHT_J:
+        if (pcm_format == SNDRV_PCM_FORMAT_S24_LE)
+          val = 0x02;
+        else if (pcm_format == SNDRV_PCM_FORMAT_S16_LE)
+          val = 0x03;
+        break;
+      case SND_SOC_DAIFMT_I2S:
+        val = 0x00;
+        break;
+      case SND_SOC_DAIFMT_LEFT_J:
+        val = 0x01;
+        break;
+      default:
+        dev_err(codec->dev, "Invalid DAI format\n");
+        return -EINVAL;
+    }
+  }
+  else
+  {
+    dev_err(codec->dev, "tdm_slots must be 2 or 8\n");
+    return -EINVAL;
+  }
 
 	ret = regmap_update_bits(priv->regmap, PCM1690_FMT_CONTROL, 0x0f, val);
 	if (ret < 0)
@@ -204,10 +232,20 @@ static int pcm1690_hw_params(struct snd_pcm_substream *substream,
 	return pcm1690_set_deemph(codec);
 }
 
+static int pcm1690_set_tdm_slots(struct snd_soc_dai *dai, unsigned int tx_mask, unsigned int rx_mask, int slots, int slot_width)
+{
+	struct snd_soc_codec *codec = dai->codec;
+	struct pcm1690_private *priv = snd_soc_codec_get_drvdata(codec);
+
+	priv->tdm_slots = slots;
+	return 0;
+}
+
 static const struct snd_soc_dai_ops pcm1690_dai_ops = {
 	.set_fmt	= pcm1690_set_dai_fmt,
 	.hw_params	= pcm1690_hw_params,
 	.digital_mute	= pcm1690_digital_mute,
+	.set_tdm_slot	= pcm1690_set_tdm_slots,
 };
 
 static const struct snd_soc_dapm_widget pcm1690_dapm_widgets[] = {
@@ -305,6 +343,9 @@ static int pcm1690_i2c_probe(struct i2c_client *client,
 	priv = devm_kzalloc(&client->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
+
+	// Defaults
+	priv->tdm_slots = 2;
 
 	priv->regmap = devm_regmap_init_i2c(client, &pcm1690_regmap);
 	if (IS_ERR(priv->regmap)) {
