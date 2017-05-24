@@ -92,6 +92,13 @@ struct pcm1690_private {
 
 static const int pcm1690_deemph[] = { 0, 48000, 44100, 32000 };
 
+// Dummy function because I disabled it. See elsewhere.
+static int pcm1690_set_deemph(struct snd_soc_codec *codec)
+{
+  return 0;
+}
+
+/*
 static int pcm1690_set_deemph(struct snd_soc_codec *codec)
 {
 	struct pcm1690_private *priv = snd_soc_codec_get_drvdata(codec);
@@ -137,6 +144,7 @@ static int pcm1690_put_deemph(struct snd_kcontrol *kcontrol,
 
 	return pcm1690_set_deemph(codec);
 }
+*/
 
 static int pcm1690_set_dai_fmt(struct snd_soc_dai *codec_dai,
 			      unsigned int format)
@@ -285,8 +293,16 @@ static const struct snd_kcontrol_new pcm1690_controls[] = {
 	SOC_DOUBLE_R_TLV("Channel 7/8 Playback Volume",
 			PCM1690_ATT_CONTROL(7), PCM1690_ATT_CONTROL(8), 0,
 			0x7f, 0, pcm1690_dac_tlv),
+
+  /*
+   * Disabled because this requires snd_kcontrol->private_data to be set with pcm1690_private. It's not now, so it crashes.
+   * I can't figure out how this is done. It looks like you can't use snd_soc_codec_driver.controls, but instead call 
+   * 'struct snd_kcontrol * snd_soc_cnew(const struct snd_kcontrol_new * _template, void * data, const char * long_name, const char * prefix)'
+   * manually, passing the data, but there are still pieces missing...
+   *
 	SOC_SINGLE_BOOL_EXT("De-emphasis Switch", 0,
 			    pcm1690_get_deemph, pcm1690_put_deemph),
+  */
 };
 
 static struct snd_soc_dai_driver pcm1690_dai = {
