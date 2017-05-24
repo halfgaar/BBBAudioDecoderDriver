@@ -6,6 +6,7 @@
 #include <sound/soc.h>
 #include <linux/gpio.h>
 
+#define CLOCK_ENABLE_LINE 59 // GPIO1_27. Needs to be 1 on BBB to enable the oscillator output on GPIO3_21
 #define RESET_ACTIVE_LOW 48
 #define TEMP_TEST_LED 7
 
@@ -176,6 +177,12 @@ static int snd_bbb_audio_decoder_probe(struct platform_device *pdev)
   if (ret)
     return ret;
 
+  // This is not done by the clock driver. We need it to enable clock output.
+  ret = gpio_request(CLOCK_ENABLE_LINE, "ahclkx_enable");
+  if (ret != 0 )
+    return ret;
+  gpio_direction_output(CLOCK_ENABLE_LINE, 1);
+
   mclk = devm_clk_get(&pdev->dev, "mclk");
   if (PTR_ERR(mclk) == -EPROBE_DEFER)
   {
@@ -232,8 +239,10 @@ static int snd_bbb_audio_decoder_probe(struct platform_device *pdev)
 
 static int snd_bbb_audio_decoder_remove(struct platform_device *pdev)
 {
+  gpio_set_value(CLOCK_ENABLE_LINE, 0);
   gpio_set_value(RESET_ACTIVE_LOW, 0);
   gpio_set_value(TEMP_TEST_LED, 0);
+  gpio_free(CLOCK_ENABLE_LINE);
   gpio_free(RESET_ACTIVE_LOW);
   gpio_free(TEMP_TEST_LED);
 
