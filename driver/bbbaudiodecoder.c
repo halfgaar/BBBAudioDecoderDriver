@@ -225,7 +225,12 @@ static int snd_bbb_audio_decoder_probe(struct platform_device *pdev)
   ret = gpio_request(TEMP_TEST_LED, "temp_test_led");
   if (ret != 0 )
     return ret;
-  gpio_direction_output(RESET_ACTIVE_LOW, 1);
+
+  // Setting 0-to-1 manually because the output seems to float at half supply
+  // voltage if I set to 1 directly failing to turn on the DIR9001
+  gpio_direction_output(RESET_ACTIVE_LOW, 0);
+  gpio_set_value(RESET_ACTIVE_LOW, 1);
+
   gpio_direction_output(TEMP_TEST_LED, 1);
 
   dev_info(&pdev->dev, "About to register card");
