@@ -88,6 +88,7 @@
             2 0 1 0 /* The McASP has four serializers/channels. I use axr0 as input from DIR9001, and axr2 as output to PCM1690 */
           >;
           tx-num-evt = <1>; //enble tx_fifo (boolean)
+          rx-num-evt = <1>; //enble tx_fifo (boolean)
        }; 
     };
 
