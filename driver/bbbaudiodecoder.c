@@ -28,6 +28,7 @@ static int snd_bbb_audio_decoder_init(struct snd_soc_pcm_runtime *rtd)
   struct snd_soc_dai *dac_dai = rtd->codec_dai;
   int ret;
   unsigned int tdm_mask = 0x00;
+  unsigned int rx_tdm_mask = 0xff;
   u32 cpu_to_dac_tdm_slots;
 
   dev_info(card->dev, "Init starting...");
@@ -55,8 +56,9 @@ static int snd_bbb_audio_decoder_init(struct snd_soc_pcm_runtime *rtd)
 
   tdm_mask = 0xFF;
   tdm_mask = tdm_mask >> (8 - cpu_to_dac_tdm_slots);
+  rx_tdm_mask = rx_tdm_mask >> (8 - 2);
 
-  ret = snd_soc_dai_set_tdm_slot(dac_dai, 0, 0, 8, 32);
+  ret = snd_soc_dai_set_tdm_slot(dac_dai, 0, 0, cpu_to_dac_tdm_slots, 32);
   if (ret < 0){
     dev_err(dac_dai->dev, "Unable to set pcm1690 TDM slots.\n");
     return ret;
@@ -64,7 +66,7 @@ static int snd_bbb_audio_decoder_init(struct snd_soc_pcm_runtime *rtd)
 
   // TDM setting for audio output, I think? Does this then configure the DAC with its sample format, or something?
   dev_info(card->dev, "Setting TDM slots on audio processor, for output, to %d", cpu_to_dac_tdm_slots);
-  ret = snd_soc_dai_set_tdm_slot(cpu_dai, tdm_mask, tdm_mask, cpu_to_dac_tdm_slots, 32);
+  ret = snd_soc_dai_set_tdm_slot(cpu_dai, tdm_mask, rx_tdm_mask, cpu_to_dac_tdm_slots, 32);
   if (ret < 0)
   {
     dev_err(cpu_dai->dev, "Unable to set McASP TDM slots.\n");
