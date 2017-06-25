@@ -265,6 +265,8 @@ SND_SOC_DAPM_OUTPUT("VOUT5"),
 SND_SOC_DAPM_OUTPUT("VOUT6"),
 SND_SOC_DAPM_OUTPUT("VOUT7"),
 SND_SOC_DAPM_OUTPUT("VOUT8"),
+SND_SOC_DAPM_INPUT("IN1"),
+SND_SOC_DAPM_INPUT("IN2"),
 };
 
 static const struct snd_soc_dapm_route pcm1690_dapm_routes[] = {
@@ -276,6 +278,8 @@ static const struct snd_soc_dapm_route pcm1690_dapm_routes[] = {
 	{ "VOUT6", NULL, "Playback" },
 	{ "VOUT7", NULL, "Playback" },
 	{ "VOUT8", NULL, "Playback" },
+  { "IN1", NULL, "Capture" },
+  { "IN2", NULL, "Capture" },
 };
 
 static const DECLARE_TLV_DB_SCALE(pcm1690_dac_tlv, -6350, 50, 1);
@@ -314,6 +318,13 @@ static struct snd_soc_dai_driver pcm1690_dai = {
 		.rates = PCM1690_PCM_RATES,
 		.formats = PCM1690_PCM_FORMATS,
 	},
+  .capture = {
+    .stream_name = "Capture",
+    .channels_min = 2,
+    .channels_max = 2,
+    .rates = SNDRV_PCM_RATE_8000_192000,
+    .formats = PCM1690_PCM_FORMATS,
+  },
 	.ops = &pcm1690_dai_ops,
 };
 
