@@ -153,8 +153,8 @@ static int pcm1690_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	struct pcm1690_private *priv = snd_soc_codec_get_drvdata(codec);
 
 	/* The PCM1690 can only be slave to all clocks */
-	if ((format & SND_SOC_DAIFMT_MASTER_MASK) != SND_SOC_DAIFMT_CBS_CFS) {
-		dev_err(codec->dev, "Invalid clocking mode. PCM1690 can only be slave: (SND_SOC_DAIFMT_CBS_CFS)\n");
+	if ((format & SND_SOC_DAIFMT_MASTER_MASK) != SND_SOC_DAIFMT_CBM_CFM) {
+		dev_err(codec->dev, "Invalid clocking mode. PCM1690+DIR9001 must operate with a hacked davinci-mcasp driver.\n");
 		return -EINVAL;
 	}
 

@@ -22,11 +22,11 @@
                     0x078 0x2e  /* P9 pin 12. Wanted function: mcasp0_aclkr_mux3 (mode6) */
                     0x1ac 0x28  /* P9 pin 25. Wanted function: mcasp0_ahclkx (mode 0) */
                     0x1a4 0x28  /* P9 pin 27. Wanted function: mcasp0_fsr (mode 0) */
-                    0x19c 0x2a  /* P9 pin 28. Wanted function: mcasp0_axr2 (mode 0) */
+                    0x19c 0x28  /* P9 pin 28. Wanted function: mcasp0_ahclkr (mode 0) */
                     0x194 0x28  /* P9 pin 29. Wanted function: mcasp0_fsx (mode 0) */
                     0x198 0x28  /* P9 pin 30. Wanted function: mcasp0_axr0 (mode 0) */
                     0x190 0x28  /* P9 pin 31. Wanted function: mcasp0_aclkx (mode 0) */
-                    0x06c 0x07  /* gpmc_a11.GPIO1_27 mux mode 7, needs to be 1 for ahclkx clock output */
+                    0x1a8 0x28  /* P9 pin 41. Wanted function: mcasp_axr1 (mode 0) */
                 >;
             };
 
@@ -39,7 +39,6 @@
 
             bbb_audio_decoder_led_pins: pinmux_bbb_audiodecoder_led_pins {
                 pinctrl-single,pins = <
-                    0x1b4 0x0f  /* P9 pin 41. Wanted function: GPIO0[20] (Ready LED) (mode 7) */
                     0x164 0x0f  /* P9 pin 42. Wanted function: GPIO0[7] (Decoding LED) (mode 7) */
                 >;
             };
@@ -85,7 +84,7 @@
           op-mode = <0>;          /* MCASP_IIS_MODE */ // ???
           tdm-slots = <8>;
           serial-dir = <  /* 0: INACTIVE, 1: TX, 2: RX */
-            2 0 1 0 /* The McASP has four serializers/channels. I use axr0 as input from DIR9001, and axr2 as output to PCM1690 */
+            2 1 0 0 /* The McASP has four serializers/channels. I use axr0 as input from DIR9001, and axr1 as output to PCM1690 */
           >;
           tx-num-evt = <1>; //enble tx_fifo (boolean)
           rx-num-evt = <1>; //enble tx_fifo (boolean)
