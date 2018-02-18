@@ -9,7 +9,7 @@
 /plugin/;
 
 /{
-    compatible = "ti,beaglebone", "ti,beaglebone-black","ti,beaglebone-green";
+    compatible = "ti,beaglebone", "ti,beaglebone-black","ti,beaglebone-green", "halfgaar,bbbaudiodecoder";
     part-number = "BBBAudioDecoder";
     version = "00A0";
 

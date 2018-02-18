@@ -144,6 +144,7 @@ static const struct of_device_id snd_bbb_audio_decoder_dt_ids[] =
   },
   { /* sentinel */ }
 };
+MODULE_DEVICE_TABLE(of, snd_bbb_audio_decoder_dt_ids);
 
 static struct snd_soc_card snd_bbb_audio_decoder_card =
 {
