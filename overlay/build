@@ -5,3 +5,6 @@ echo "Compiling the overlay from .dts to .dtbo"
 dtc -O dtb -o BBBAudioDecoder-00A0.dtbo -b 0 -@ BBBAudioDecoder.dts
 echo "Copying..."
 cp BBBAudioDecoder-00A0.dtbo /lib/firmware
+
+echo
+echo "Remember to run 'update-initramfs -u' if you want this dtbo file to be visible to the cape manager at boot time."
