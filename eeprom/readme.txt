@@ -1,4 +1,4 @@
-By writing this eeprom, the cap manager will detect it on boot and load the
+By writing this eeprom, the cape manager will detect it on boot and load the
 firmware file '/lib/firmware/BBBAudioDecoder-00A0.dtbo'. It will also prevent
 the universal cape manager from claiming the GPIOs.
 

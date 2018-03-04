@@ -3,7 +3,7 @@
  *
  * Author: Wiebe Cazemier wiebe@halfgaar.net
  *
- * Based on PCM1690 from alsa-soc, by StreamUnlimited GmbH,
+ * Based on PCM1681 from alsa-soc, by StreamUnlimited GmbH,
  *   Marek Belisko <marek.belisko@streamunlimited.com>
  *
  * This program is free software; you can redistribute it and/or
