@@ -459,14 +459,14 @@ void PlaybackWorker::decodeWithFFMpeg()
 
 void PlaybackWorker::writeDirectlyToOutput()
 {
-    emit newCodecName("Raw PCM");
+    emit newCodecName("No signal");
 
-    mRingBuffer.openPlaybackDevice(2);
     const uint totalBytes = FRAMES_IN_BUFFER * mRingBuffer.captureFrameSize;
     uint8_t buf[totalBytes];
 
-    QThread::msleep(20);
-
+    bool bytesFound = false;
+    bool playbackOpened = false;
+    uint i = 0;
     while (!mThisThreadAbort)
     {
         // Because of the semaphores, this hangs until enough frames are available.
@@ -476,6 +476,33 @@ void PlaybackWorker::writeDirectlyToOutput()
         if (mRingBuffer.mGpPIOFunctions.DIR9001SeesEncodedAudio())
         {
             break;
+        }
+
+        bytesFound = false;
+        for (i = 0; i < totalBytes; i++)
+        {
+            if (buf[i] != 0)
+            {
+                bytesFound = true;
+                break;
+            }
+        }
+
+        if (bytesFound)
+        {
+            if (!playbackOpened)
+            {
+                mRingBuffer.openPlaybackDevice(2);
+                playbackOpened = true;
+                emit newCodecName("Raw PCM");
+                continue; // Don't play bytes captured during opening device, to avoid delay.
+            }
+        }
+        else
+        {
+            if (playbackOpened)
+                break;
+            continue; // Continue reading the buffer and waiting for bytes.
         }
 
         int ret = snd_pcm_writei(mRingBuffer.playback_handle, buf, FRAMES_IN_BUFFER);
