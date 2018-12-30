@@ -55,7 +55,7 @@ static const struct reg_default pcm1690_reg_defaults[] = {
 	{ 0x41,	0x00 },
 	{ 0x42,	0x00 },
 	{ 0x43,	0x00 },
-	{ 0x44,	0x00 },
+	{ 0x44,	PCM1690_SOFT_MUTE_ALL }, // Alsa-soc calls digital_mute(0) when opening device, so we need to started muted
 	{ 0x45,	0x00 },
 	{ 0x46,	0x00 },
 	{ 0x47,	0x00 },
