@@ -75,6 +75,10 @@ AudioRingBuffer::AudioRingBuffer(GpIOFunctions &gpIOFunctions, QObject *parent) 
     printStatusTimer.setInterval(1000);
     connect(&printStatusTimer, &QTimer::timeout, this, &AudioRingBuffer::onStatusTimer);
     printStatusTimer.start();
+
+    sampeRateCalculatorTimer.setInterval(1000);
+    connect(&sampeRateCalculatorTimer, &QTimer::timeout, this, &AudioRingBuffer::onSampleRateCalculatorTimer);
+    sampeRateCalculatorTimer.start();
 }
 
 AudioRingBuffer::~AudioRingBuffer()
@@ -102,8 +106,32 @@ void AudioRingBuffer::captureBufferToCircularBuffer(int bytes)
 void AudioRingBuffer::onStatusTimer()
 {
     QString line = QString("Buf size: %1").arg(usedBytes.available());
+#ifdef QT_DEBUG
     std::cout << line.toLatin1().data() << std::endl;
+#endif
     emit bufferBytesInfo(line);
+}
+
+/*!
+ * \brief AudioRingBuffer::onSampleRateCalculatorTimer Check if a PLL signal is present with a hack.
+ *
+ * A hack. The DIR9001 has a VCO that seems to output about 22 kHz when it's free-running. This is temperature and supply voltage
+ * dependent. Assuming we will never have to deal with such a low sample rate. Also, the the samples are based on being 2 bytes. With
+ * 24 bit, wich I2S can do, 22 kHz would be 33000 here, so taking a figure that works for 24 bit too.
+ *
+ * The hardware should have been wired to use the ERROR pin for this, but I didn't do that :(
+ */
+void AudioRingBuffer::onSampleRateCalculatorTimer()
+{
+    QMutexLocker locker(&sampleRateCounterMutex);
+    const uint samples = this->byteCounter / 4;
+    this->byteCounter = 0;
+    this->phaseLocked = samples > 36000;
+
+#ifdef QT_DEBUG
+    QString line = QString("Samples: %1").arg(samples);
+    std::cout << line.toLatin1().data() << std::endl;
+#endif
 }
 
 void AudioRingBuffer::onDecodingAborted()
@@ -464,7 +492,6 @@ void PlaybackWorker::writeDirectlyToOutput()
     const uint totalBytes = FRAMES_IN_BUFFER * mRingBuffer.captureFrameSize;
     uint8_t buf[totalBytes];
 
-    bool bytesFound = false;
     bool playbackOpened = false;
     uint i = 0;
     while (!mThisThreadAbort)
@@ -478,17 +505,11 @@ void PlaybackWorker::writeDirectlyToOutput()
             break;
         }
 
-        bytesFound = false;
-        for (i = 0; i < totalBytes; i++)
-        {
-            if (buf[i] != 0)
-            {
-                bytesFound = true;
-                break;
-            }
-        }
+        this->mRingBuffer.sampleRateCounterMutex.lock();
+        this->mRingBuffer.byteCounter += totalBytes;
+        this->mRingBuffer.sampleRateCounterMutex.unlock();
 
-        if (bytesFound)
+        if (this->mRingBuffer.phaseLocked)
         {
             if (!playbackOpened)
             {

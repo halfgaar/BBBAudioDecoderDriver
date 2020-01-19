@@ -123,6 +123,11 @@ class AudioRingBuffer : public QObject
 
     QTimer printStatusTimer;
 
+    QMutex sampleRateCounterMutex;
+    QTimer sampeRateCalculatorTimer;
+    uint byteCounter = 0;
+    bool phaseLocked = false; // See onSampleRateCalculatorTimer()
+
     void initCaptureDevice();
     void openPlaybackDevice(int numberOfChannels);
     void closePlaybackDevice();
@@ -145,6 +150,7 @@ private slots:
     void onStatusTimer();
     void onDecodingAborted();
     void onAudioFormatChanged(bool encoded);
+    void onSampleRateCalculatorTimer();
 
 public slots:
 };
