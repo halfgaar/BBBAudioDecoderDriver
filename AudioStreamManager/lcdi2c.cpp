@@ -19,6 +19,8 @@
 
 #include "lcdi2c.h"
 #include <QThread>
+#include <iostream>
+#include <errno.h>
 
 void LCDi2c::checkError(int retcode)
 {
@@ -31,17 +33,28 @@ void LCDi2c::checkError(int retcode)
 
 void LCDi2c::i2c_access(char rw, uint8_t command, i2c_smbus_data *data)
 {
+    if (!isOpen)
+        return;
+
     struct i2c_smbus_ioctl_data args;
     args.read_write = rw;
     args.command = command; // command being the data address
     args.size = I2C_SMBUS_BYTE_DATA;
     args.data = data;
 
-    checkError(ioctl(devFile.handle(), I2C_SMBUS, &args));
+    if(ioctl(devFile.handle(), I2C_SMBUS, &args) < 0)
+    {
+        int err = errno;
+        std::cerr << "Writing to LCD failed: '" << strerror(err) << "'. Disabling LCD." << std::endl;
+        isOpen = false;
+    }
 }
 
 void LCDi2c::i2c_write(uint8_t daddress, uint8_t value)
 {
+    if (!isOpen)
+        return;
+
     union i2c_smbus_data data;
     data.byte = value;
     i2c_access(I2C_SMBUS_WRITE, daddress, &data);
@@ -65,9 +78,19 @@ void LCDi2c::open()
         throw AnnotatedException(QString("Can't open '%1', it doesn't exist.").arg(DEV_PATH));
     }
 
-    devFile.open(QFile::ReadWrite);
+    if (!devFile.open(QFile::ReadWrite))
+    {
+        std::cerr << qPrintable(QString("Can't open %1. It's there, but ... ?").arg(devFile.fileName())) << std::endl;
+        return;
+    }
 
-    checkError(ioctl(devFile.handle(), I2C_SLAVE, DEVICE_ADDRESS));
+    if(ioctl(devFile.handle(), I2C_SLAVE, DEVICE_ADDRESS) < 0)
+    {
+        std::cerr << qPrintable(QString("Constructing ioctl of %1 failed. Is the LCD working?").arg(devFile.fileName())) << std::endl;
+        return;
+    }
+
+    isOpen = true;
 
     // 5V init routine, as described by datasheet.
     i2c_write(INSTRUCTION_ADDRESS, 0x38); // Function set
@@ -84,6 +107,9 @@ void LCDi2c::open()
 
 void LCDi2c::writeText(uint8_t startAddress, QString &msg)
 {
+    if (!isOpen)
+        return;
+
     i2c_write(INSTRUCTION_ADDRESS, 0b10000000 | startAddress);
     int i = 0;
     foreach (QChar c, msg)

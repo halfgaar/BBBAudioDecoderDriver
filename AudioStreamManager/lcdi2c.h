@@ -41,6 +41,7 @@ class LCDi2c : public QObject
     Q_OBJECT
 
     QFile devFile;
+    bool isOpen = false;
 
     /**
      * @brief checkError checks the return code and generates a message using the kernel's strerror function and
