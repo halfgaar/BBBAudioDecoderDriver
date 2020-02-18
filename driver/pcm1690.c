@@ -284,19 +284,25 @@ static const struct snd_soc_dapm_route pcm1690_dapm_routes[] = {
 
 static const DECLARE_TLV_DB_SCALE(pcm1690_dac_tlv, -6350, 50, 1);
 
+// Important: 'Volume' and 'Switch' aren't just names. They names need to match and are consolidated to a volume control and mute switch.
 static const struct snd_kcontrol_new pcm1690_controls[] = {
-	SOC_DOUBLE_R_TLV("Channel 1/2 Playback Volume",
+	SOC_DOUBLE_R_TLV("Ch 1/2 Volume",
 			PCM1690_ATT_CONTROL(1), PCM1690_ATT_CONTROL(2), 0,
 			0x7f, 0, pcm1690_dac_tlv),
-	SOC_DOUBLE_R_TLV("Channel 3/4 Playback Volume",
+	SOC_DOUBLE_R_TLV("Ch 3/4 Volume",
 			PCM1690_ATT_CONTROL(3), PCM1690_ATT_CONTROL(4), 0,
 			0x7f, 0, pcm1690_dac_tlv),
-	SOC_DOUBLE_R_TLV("Channel 5/6 Playback Volume",
+	SOC_DOUBLE_R_TLV("Ch 5/6 Volume",
 			PCM1690_ATT_CONTROL(5), PCM1690_ATT_CONTROL(6), 0,
 			0x7f, 0, pcm1690_dac_tlv),
-	SOC_DOUBLE_R_TLV("Channel 7/8 Playback Volume",
+	SOC_DOUBLE_R_TLV("Ch 7/8 Volume",
 			PCM1690_ATT_CONTROL(7), PCM1690_ATT_CONTROL(8), 0,
 			0x7f, 0, pcm1690_dac_tlv),
+
+	SOC_DOUBLE("Ch 1/2 Switch", PCM1690_SOFT_MUTE, 0, 1, 1, 1),
+	SOC_DOUBLE("Ch 3/4 Switch", PCM1690_SOFT_MUTE, 2, 3, 1, 1),
+	SOC_DOUBLE("Ch 5/6 Switch", PCM1690_SOFT_MUTE, 4, 5, 1, 1),
+	SOC_DOUBLE("Ch 7/8 Switch", PCM1690_SOFT_MUTE, 6, 7, 1, 1)
 
   /*
    * Disabled because this requires snd_kcontrol->private_data to be set with pcm1690_private. It's not now, so it crashes.

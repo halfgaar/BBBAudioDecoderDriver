@@ -1,6 +1,11 @@
 #!/bin/bash -e
 
-HOST="192.168.178.104"
+if [ -z "$BBB_AUDIO_DECODER_IP" ]; then
+  echo "Define BBB_AUDIO_DECODER_IP somewhere, in your .bash_aliases or something"
+  exit 1
+fi
+
+HOST="$BBB_AUDIO_DECODER_IP"
 
 export PATH="/home/halfgaar/notbackedup/ti-sdk/ti-processor-sdk-linux-am335x-evm-03.03.00.04/linux-devkit/sysroots/x86_64-arago-linux/usr/bin:$PATH"
 
