@@ -71,6 +71,9 @@ void StreamManager::onError(const QString &error)
 
 void StreamManager::onNewCodecName(const QString &name)
 {
+#ifdef QT_DEBUG
+    std::cout << qPrintable(name) << std::endl;
+#endif
     mLcd.setLineOne(name);
 }
 

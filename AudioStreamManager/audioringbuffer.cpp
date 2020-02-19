@@ -21,6 +21,7 @@
 
 #include "audioringbuffer.h"
 #include <iostream>
+#include <time.h>
 
 int readFromCircularBuffer(void *opaque, uint8_t *buf, int buf_size)
 {
@@ -53,6 +54,8 @@ AudioRingBuffer::AudioRingBuffer(GpIOFunctions &gpIOFunctions, QObject *parent) 
     mPlaybackWorker(NULL),
     mPlaybackThread(new QThread())
 {
+    this->selem_name << "Ch 1/2" << "Ch 3/4" << "Ch 5/6" << "Ch 7/8";
+
     mPlaybackThread.setObjectName("Decode/Playback");
     mCaptureThread.setObjectName("Capture");
     mPlaybackThread.start();
@@ -260,12 +263,55 @@ void AudioRingBuffer::openPlaybackDevice(int numberOfChannels)
     checkError(snd_pcm_prepare(playback_handle));
 
     snd_pcm_hw_params_free(hw_params);
+
+    giveUpOnMixer = false;
+    checkMixerError(snd_mixer_open(&mixer_handle, 0));
+    checkMixerError(snd_mixer_attach(mixer_handle, card));
+    checkMixerError(snd_mixer_selem_register(mixer_handle, nullptr, nullptr));
+    checkMixerError(snd_mixer_load(mixer_handle));
+    setAlsaMute(false);
+}
+
+void AudioRingBuffer::setAlsaMute(bool mute)
+{
+    // The PCM1690 DAC driver I wrote is not a proper one that exposes a multi-channel DAC that ALSA
+    // understands, nor does it have a master control. So, we're hacking a bit (like my drivers
+    // themselves :/ ).
+
+    // TODO: some error handling if it can't find it.
+
+    if (giveUpOnMixer)
+        return;
+
+    if (mixer_handle == nullptr)
+        return;
+
+    int m = static_cast<int>(!mute);
+
+    for(QString selem : this->selem_name)
+    {
+        snd_mixer_selem_id_t *sid;
+        snd_mixer_selem_id_alloca(&sid);
+        snd_mixer_selem_id_set_index(sid, 0);
+        snd_mixer_selem_id_set_name(sid, qPrintable(selem));
+        snd_mixer_elem_t* elem = snd_mixer_find_selem(mixer_handle, sid);
+
+        if (snd_mixer_selem_has_playback_switch(elem))
+        {
+            snd_mixer_selem_set_playback_switch_all(elem, m);
+        }
+    }
 }
 
 void AudioRingBuffer::closePlaybackDevice()
 {
     if (playback_handle)
     {
+        if (!giveUpOnMixer)
+        {
+            snd_mixer_close(mixer_handle);
+            mixer_handle = nullptr;
+        }
         checkError(snd_pcm_close(playback_handle));
         playback_handle = NULL;
     }
@@ -275,6 +321,16 @@ void AudioRingBuffer::checkError(int ret)
 {
     if (ret < 0)
         std::cerr << "Something went wrong initing the audio device and I'm too lazy to figure out what" << std::endl;
+}
+
+void AudioRingBuffer::checkMixerError(int ret)
+{
+    if (ret < 0)
+    {
+        giveUpOnMixer = true;
+        mixer_handle = nullptr;
+        std::cerr << "Something went wrong with the alser mixer and I'm too lazy to figure out what. Error code: " << ret << std::endl;
+    }
 }
 
 void AudioRingBuffer::startThreads()
@@ -493,7 +549,12 @@ void PlaybackWorker::writeDirectlyToOutput()
     uint8_t buf[totalBytes];
 
     bool playbackOpened = false;
-    uint i = 0;
+    uint number_of_silent_buffers = 0;
+    uint8_t current_mute_mode = MUTE_MODE_UNDEFINED;
+    time_t last_mute_change = 0;
+    QString pcm_normal = "Raw PCM";
+    QString pcm_muted = "Raw PCM (muted)";
+
     while (!mThisThreadAbort)
     {
         // Because of the semaphores, this hangs until enough frames are available.
@@ -515,18 +576,20 @@ void PlaybackWorker::writeDirectlyToOutput()
             {
                 mRingBuffer.openPlaybackDevice(2);
                 playbackOpened = true;
-                emit newCodecName("Raw PCM");
                 continue; // Don't play bytes captured during opening device, to avoid delay.
             }
         }
         else
         {
             if (playbackOpened)
+            {
+                std::cout << "Stopping PCM decoding because we're not phase locked." << std::endl;
                 break;
+            }
             continue; // Continue reading the buffer and waiting for bytes.
         }
 
-        int ret = snd_pcm_writei(mRingBuffer.playback_handle, buf, FRAMES_IN_BUFFER);
+        int ret = snd_pcm_writei(mRingBuffer.playback_handle, buf, FRAMES_IN_BUFFER); // non-blocking
         if (ret == -EPIPE)
         {
             std::cerr << "Broken write pipe because the ALSA playback buffer ran out. Re-preparing PCM" << std::endl;
@@ -536,6 +599,40 @@ void PlaybackWorker::writeDirectlyToOutput()
         else if (ret < 0)
         {
             std::cerr << "Unknown ALSA snd_pcm_writei error: " << ret << std::endl;
+        }
+
+        // We have some time until our capture buffer has more data, to do some processing.
+
+        uint8_t num_different_bytes = 0;
+        uint8_t previous_byte = 0;
+        for (uint i = 0; i < totalBytes && num_different_bytes < 6; ++i)
+        {
+            uint8_t b = buf[i];
+            if (b > 0 && b < 255 && b != previous_byte)
+                ++num_different_bytes;
+            previous_byte = b;
+        }
+
+        if (num_different_bytes < 5)
+            number_of_silent_buffers++;
+        else
+            number_of_silent_buffers = 0;
+
+        uint8_t mute_mode = number_of_silent_buffers < 5000 ? MUTE_MODE_UNMUTED : MUTE_MODE_MUTED;
+
+        // Be sure not do this too often. It causes too much time, messing up the byte counting of mRingBuffer.byteCounter
+        // and decoding will be stuck in stoping/starting all the time.
+        if (last_mute_change + 1 < time(nullptr) && mute_mode != current_mute_mode)
+        {
+            last_mute_change = time(nullptr);
+
+            if (mute_mode == MUTE_MODE_MUTED)
+                emit newCodecName(pcm_muted);
+            if (mute_mode == MUTE_MODE_UNMUTED)
+                emit newCodecName(pcm_normal);
+
+            this->mRingBuffer.setAlsaMute(mute_mode == MUTE_MODE_MUTED);
+            current_mute_mode = mute_mode;
         }
     }
 

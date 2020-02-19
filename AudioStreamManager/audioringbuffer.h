@@ -44,6 +44,10 @@ extern "C"
 #define RING_BUFFER_SIZE 10485760
 #define AVIO_CTX_BUFFER_SIZE 4096
 
+#define MUTE_MODE_UNDEFINED 0
+#define MUTE_MODE_UNMUTED 1
+#define MUTE_MODE_MUTED 2
+
 class AudioRingBuffer;
 
 class CaptureWorker : public QObject
@@ -128,10 +132,17 @@ class AudioRingBuffer : public QObject
     uint byteCounter = 0;
     bool phaseLocked = false; // See onSampleRateCalculatorTimer()
 
+    snd_mixer_t *mixer_handle = nullptr;
+    const char *card = "default";
+    QList<QString> selem_name;
+    bool giveUpOnMixer = false;
+
     void initCaptureDevice();
     void openPlaybackDevice(int numberOfChannels);
+    void setAlsaMute(bool mute);
     void closePlaybackDevice();
     void checkError(int ret);
+    void checkMixerError(int ret);
     void makePlaybackWorker();
 public:
     explicit AudioRingBuffer(GpIOFunctions &gpIOFunctions, QObject *parent = nullptr);
