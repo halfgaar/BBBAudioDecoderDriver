@@ -238,16 +238,20 @@ void AudioRingBuffer::initCaptureDevice()
     checkError(snd_pcm_hw_params_set_format(capture_handle, hw_params, SND_PCM_FORMAT_S16_LE));
     checkError(snd_pcm_hw_params_set_rate_near(capture_handle, hw_params, &rate, 0));
     checkError(snd_pcm_hw_params_set_channels(capture_handle, hw_params, 2));
-    checkError(snd_pcm_hw_params_set_buffer_time(capture_handle, hw_params, 10000, 0)); // low latency
-    //uint buffer_time; snd_pcm_hw_params_get_buffer_time_max(hw_params, &buffer_time, 0);
-    //std::cerr << buffer_time << std::endl;
+
+    unsigned int buffer_time_us = 10000;
+    int dir = 0; checkError(snd_pcm_hw_params_set_buffer_time_near(capture_handle, hw_params, &buffer_time_us, &dir)); // low latency
+#ifdef QT_DEBUG
+    printf("Capture device buffer set to: %d us, rounding direction: %d\n", buffer_time_us, dir);
+#endif
+
     checkError(snd_pcm_hw_params(capture_handle, hw_params));
     checkError(snd_pcm_prepare(capture_handle));
 
     snd_pcm_hw_params_free(hw_params);
 }
 
-void AudioRingBuffer::openPlaybackDevice(int numberOfChannels)
+void AudioRingBuffer::openPlaybackDevice(int numberOfChannels, unsigned int buffer_time_us)
 {
     unsigned int rate = 48000; // Actually unnecessary, because my hacked mcasp davinci driver ignores it, because it's clocked externally.
     snd_pcm_hw_params_t *hw_params;
@@ -259,6 +263,12 @@ void AudioRingBuffer::openPlaybackDevice(int numberOfChannels)
     checkError(snd_pcm_hw_params_set_format(playback_handle, hw_params, SND_PCM_FORMAT_S16_LE));
     checkError(snd_pcm_hw_params_set_rate_near(playback_handle, hw_params, &rate, 0));
     checkError(snd_pcm_hw_params_set_channels(playback_handle, hw_params, numberOfChannels));
+
+    int dir = 0; checkError(snd_pcm_hw_params_set_buffer_time_near(playback_handle, hw_params, &buffer_time_us, &dir));
+#ifdef QT_DEBUG
+    printf("Playback device buffer set to: %d us, rounding direction: %d\n", buffer_time_us, dir);
+#endif
+
     checkError(snd_pcm_hw_params(playback_handle, hw_params));
     checkError(snd_pcm_prepare(playback_handle));
 
@@ -465,7 +475,7 @@ void PlaybackWorker::decodeWithFFMpeg()
     emit newCodecName(name);
     std::cout << name.toLatin1().data() << std::endl;
 
-    mRingBuffer.openPlaybackDevice(8);
+    mRingBuffer.openPlaybackDevice(8, 50000);
 
     bool initialPileUpSkipped = false;
 
@@ -574,7 +584,7 @@ void PlaybackWorker::writeDirectlyToOutput()
         {
             if (!playbackOpened)
             {
-                mRingBuffer.openPlaybackDevice(2);
+                mRingBuffer.openPlaybackDevice(2, 10000);
                 playbackOpened = true;
                 continue; // Don't play bytes captured during opening device, to avoid delay.
             }

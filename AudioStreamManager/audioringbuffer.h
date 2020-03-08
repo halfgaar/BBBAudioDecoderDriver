@@ -138,7 +138,7 @@ class AudioRingBuffer : public QObject
     bool giveUpOnMixer = false;
 
     void initCaptureDevice();
-    void openPlaybackDevice(int numberOfChannels);
+    void openPlaybackDevice(int numberOfChannels, unsigned int buffer_time_us);
     void setAlsaMute(bool mute);
     void closePlaybackDevice();
     void checkError(int ret);
