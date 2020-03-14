@@ -139,10 +139,9 @@ class AudioRingBuffer : public QObject
 
     void initCaptureDevice();
     void openPlaybackDevice(int numberOfChannels, unsigned int buffer_time_us);
-    void setAlsaMute(bool mute);
     void closePlaybackDevice();
     void checkError(int ret);
-    void checkMixerError(int ret);
+    int checkMixerError(int ret);
     void makePlaybackWorker();
 public:
     explicit AudioRingBuffer(GpIOFunctions &gpIOFunctions, QObject *parent = nullptr);
@@ -151,6 +150,9 @@ public:
     int circularBufferToDecodeBuffer(uint8_t *buf, int nbytes);
     inline bool DIR9001SeesEncodedAudio() { return mGpPIOFunctions.DIR9001SeesEncodedAudio(); }
     void startThreads();
+    void setAlsaMute(bool mute);
+    bool getAlsaMute();
+    void sleepUntilMutedOrMax(int msecMax);
 
 signals:
     void newCodecName(const QString &name);

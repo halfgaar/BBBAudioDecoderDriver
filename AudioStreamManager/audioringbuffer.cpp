@@ -22,6 +22,7 @@
 #include "audioringbuffer.h"
 #include <iostream>
 #include <time.h>
+#include <sys/sysinfo.h>
 
 int readFromCircularBuffer(void *opaque, uint8_t *buf, int buf_size)
 {
@@ -82,6 +83,12 @@ AudioRingBuffer::AudioRingBuffer(GpIOFunctions &gpIOFunctions, QObject *parent) 
     sampeRateCalculatorTimer.setInterval(1000);
     connect(&sampeRateCalculatorTimer, &QTimer::timeout, this, &AudioRingBuffer::onSampleRateCalculatorTimer);
     sampeRateCalculatorTimer.start();
+
+    giveUpOnMixer = false;
+    checkMixerError(snd_mixer_open(&mixer_handle, 0));
+    checkMixerError(snd_mixer_attach(mixer_handle, card));
+    checkMixerError(snd_mixer_selem_register(mixer_handle, nullptr, nullptr));
+    checkMixerError(snd_mixer_load(mixer_handle));
 }
 
 AudioRingBuffer::~AudioRingBuffer()
@@ -91,6 +98,12 @@ AudioRingBuffer::~AudioRingBuffer()
 
     if (mPlaybackWorker)
         mPlaybackWorker->deleteLater();
+
+    if (!giveUpOnMixer)
+    {
+        snd_mixer_close(mixer_handle);
+        mixer_handle = nullptr;
+    }
 }
 
 void AudioRingBuffer::captureBufferToCircularBuffer(int bytes)
@@ -274,11 +287,6 @@ void AudioRingBuffer::openPlaybackDevice(int numberOfChannels, unsigned int buff
 
     snd_pcm_hw_params_free(hw_params);
 
-    giveUpOnMixer = false;
-    checkMixerError(snd_mixer_open(&mixer_handle, 0));
-    checkMixerError(snd_mixer_attach(mixer_handle, card));
-    checkMixerError(snd_mixer_selem_register(mixer_handle, nullptr, nullptr));
-    checkMixerError(snd_mixer_load(mixer_handle));
     setAlsaMute(false);
 }
 
@@ -313,15 +321,82 @@ void AudioRingBuffer::setAlsaMute(bool mute)
     }
 }
 
+bool AudioRingBuffer::getAlsaMute()
+{
+    if (giveUpOnMixer)
+        return false;
+
+    // For our purposes, we need to make a local mixer, because otherwise we
+    // don't see changes to the device made by other/external mixers.
+    snd_mixer_t *local_mixer_handle = nullptr;
+    snd_mixer_open(&local_mixer_handle, 0);
+    snd_mixer_attach(local_mixer_handle, card);
+    snd_mixer_selem_register(local_mixer_handle, nullptr, nullptr);
+    snd_mixer_load(local_mixer_handle);
+
+    for(QString selem : this->selem_name)
+    {
+        snd_mixer_selem_id_t *sid;
+        snd_mixer_selem_id_alloca(&sid);
+        snd_mixer_selem_id_set_index(sid, 0);
+        snd_mixer_selem_id_set_name(sid, qPrintable(selem));
+        snd_mixer_elem_t* elem = snd_mixer_find_selem(local_mixer_handle, sid);
+
+        if (snd_mixer_selem_has_playback_switch(elem))
+        {
+            // Idea of going over 32 channels taken from alsa-lib source code for snd_mixer_selem_set_playback_switch_all()
+            for (int i = 0; i < 32; i++)
+            {
+                snd_mixer_selem_channel_id_t chn = static_cast<snd_mixer_selem_channel_id_t>(i);
+                if (!snd_mixer_selem_has_playback_channel(elem, chn))
+                    continue;
+
+                int value = 0;
+                int ret = checkMixerError(snd_mixer_selem_get_playback_switch(elem, chn, &value));
+
+                if (ret == 0 && value == 0)
+                {
+                    snd_mixer_close(local_mixer_handle);
+                    return true;
+                }
+            }
+        }
+    }
+
+    snd_mixer_close(local_mixer_handle);
+    return false;
+}
+
+/**
+ * @brief AudioRingBuffer::sleepUntilMutedOrMax waits to prevent the mute race condition on boot.
+ * @param msecMax
+ *
+ * There is some weird race condition on boot, where something outside our softare mutes the playback.
+ * This resulted in the sound playing for half a second and then being muted when the sound souce was
+ * on before the decoder. This is a hack to prevent it.
+ */
+void AudioRingBuffer::sleepUntilMutedOrMax(int msecMax)
+{
+    struct sysinfo info;
+    sysinfo(&info);
+
+    if (info.uptime > 60)
+        return;
+
+    const int sleepTime = 100;
+    const int sleepMaxCount = msecMax / sleepTime;
+    for (int i = 0; i <= sleepMaxCount ; i++)
+    {
+        QThread::msleep(sleepTime);
+        if (getAlsaMute())
+            break;
+    }
+}
+
 void AudioRingBuffer::closePlaybackDevice()
 {
     if (playback_handle)
     {
-        if (!giveUpOnMixer)
-        {
-            snd_mixer_close(mixer_handle);
-            mixer_handle = nullptr;
-        }
         checkError(snd_pcm_close(playback_handle));
         playback_handle = NULL;
     }
@@ -333,7 +408,7 @@ void AudioRingBuffer::checkError(int ret)
         std::cerr << "Something went wrong initing the audio device and I'm too lazy to figure out what" << std::endl;
 }
 
-void AudioRingBuffer::checkMixerError(int ret)
+int AudioRingBuffer::checkMixerError(int ret)
 {
     if (ret < 0)
     {
@@ -341,6 +416,8 @@ void AudioRingBuffer::checkMixerError(int ret)
         mixer_handle = nullptr;
         std::cerr << "Something went wrong with the alser mixer and I'm too lazy to figure out what. Error code: " << ret << std::endl;
     }
+
+    return ret;
 }
 
 void AudioRingBuffer::startThreads()

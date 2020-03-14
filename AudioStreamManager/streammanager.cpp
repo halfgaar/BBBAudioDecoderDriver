@@ -60,6 +60,12 @@ StreamManager::~StreamManager()
 
 void StreamManager::start()
 {
+    std::cout << "Mute hack wait" << std::endl;
+    mLcd.setLineOne("Mute hack wait");
+    mRingBuffer.setAlsaMute(false);
+    mRingBuffer.sleepUntilMutedOrMax(5000);
+    std::cout << "Mute hack done" << std::endl;
+
     mRingBuffer.startThreads();
 }
 
